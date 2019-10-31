@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="es">
+	<head>
+		<title>Notas</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #cccccc;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+
+				background-color: #050505;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			a {
+				color: #0080ff;
+			}
+			
+		</style>
+	</head>
+	<body>
+	
+		<script src='js/dat.gui.min.js'></script>
+
+		<script>
+
+			// Globals
+
+			var appVersion = 1;
+
+			var DocumentTypes = [
+				"text"
+			];
+
+			
+			var documentNames = null;
+
+			var currentDocument = null;
+			
+			var textArea;
+
+			// Main code
+
+			init();
+
+			// Functions
+
+			function init() {
+
+				initStorage();
+
+				initGUI();
+
+				window.addEventListener('beforeunload', function () {
+
+					parseDocumentContent();
+
+					saveDocument( currentDocument );
+
+				} );
+
+			}
+			
+
+			function initGUI() {
+
+				var BAR_HEIGHT = 25;
+
+				textArea = document.createElement( 'textarea' );
+				
+				textArea.autocapitalize = false;
+				textArea.autocomplete = false;
+				textArea.spellcheck = false;
+				textArea.autoFocus = true;
+				textArea.wrap = "soft";
+
+				textArea.style.resize  ="none";
+				textArea.style.position = "absolute";
+
+				onWindowResize();
+
+				document.body.appendChild( textArea );
+
+				var gui;
+
+				function createGUI() {
+				
+					var guiData = {
+
+						fileName: currentDocument.name,
+
+						rename: currentDocument.name,
+						
+						newDocument: "",
+						
+						deleteDocument: "---",
+
+						deleteAllDocuments: "---",
+
+						doSave: function () {
+
+							parseDocumentContent();
+
+							saveDocument( currentDocument );
+
+						}
+
+					};
+
+					var isNewGUI = true;
+					if ( gui ) {
+						gui.destroy();
+						isNewGUI = false;
+					}
+
+					gui = new dat.GUI( {
+
+						width: 300,
+						//closed: isNewGUI,
+						closedOnTop: true,
+						hideable: false
+
+					} );
+
+					if ( isNewGUI ) {
+						gui.close();
+					}
+
+					var options = [];
+					for ( var i = 0; i < documentNames.length; i++ ) {
+						options.push( documentNames[ i ] );
+					}
+
+					options.sort();
+
+					gui.add( guiData, 'fileName', options ).name( "Documento" ).onChange( function( value ) {
+
+						parseDocumentContent();
+
+						saveDocument( currentDocument );
+
+						currentDocument = loadDocument( value );
+
+						showDocumentContent();
+
+						createGUI();
+
+					} );
+
+					gui.add( guiData, 'doSave' ).name( 'Guardar' );
+
+					gui.add( guiData, 'rename' ).name( "Renombrar" ).onFinishChange( function( value ) {
+
+						if ( value === currentDocument.name ) {
+							return;
+						}
+
+						if ( documentNames.indexOf( value ) !== -1 ) {
+							alert( "No se puede renombrar: El nombre de documento ya existe" );
+							return;
+						}
+
+						deleteDocument( currentDocument );
+
+						currentDocument.name = value;
+
+						if ( documentNames.indexOf( value ) === -1 ) {
+							documentNames.push( value );
+						}
+
+						saveDocument( currentDocument );
+
+						createGUI();
+
+					} );
+
+					gui.add( guiData, 'newDocument' ).name( "Nuevo Documento" ).onFinishChange( function( value ) {
+					
+						if ( ! value ) {
+
+							return;
+
+						}
+
+						if ( documentNames.indexOf( value ) !== -1 ) {
+
+							alert( "No se puede crear: El nombre de documento ya existe" );
+							
+							return;
+
+						}
+
+						parseDocumentContent();
+
+						saveDocument( currentDocument );
+
+						currentDocument = createEmptyDocument( "text", value );
+
+						if ( documentNames.indexOf( value ) === -1 ) {
+							documentNames.push( value );
+						}
+
+						showDocumentContent();
+
+						saveDocument( currentDocument );
+
+						createGUI();
+
+					} );
+
+					gui.add( guiData, 'deleteDocument', [ '---', 'Confirmar' ] ).name( "Borrar documento" ).onChange( function( value ) {
+	
+						if ( value !== 'Confirmar' ) {
+
+							return;
+
+						}
+
+						var index = documentNames.indexOf( currentDocument.name );
+
+						deleteDocument( currentDocument );
+
+						if ( documentNames.length === 0 ) {
+
+							currentDocument = createEmptyDocument( "text" );
+
+							if ( documentNames.indexOf( currentDocument.name ) === -1 ) {
+								documentNames.push( currentDocument.name );
+							}
+
+						}
+						else {
+
+							currentDocument = loadDocument( documentNames[ Math.min( index, documentNames.length - 1 ) ] );
+
+						}
+
+						showDocumentContent();
+
+						createGUI();
+
+					} );
+
+					gui.add( guiData, 'deleteAllDocuments', [ '---', 'Confirmar borrar TODO' ] ).name( "Borrar todo" ).onChange( function( value ) {
+	
+						if ( value !== 'Confirmar borrar TODO' ) {
+
+							return;
+
+						}
+
+						localStorage.clear();
+
+						initStorage();
+
+						showDocumentContent();
+
+						createGUI();
+
+					} );
+
+				}
+
+				createGUI();
+
+				window.addEventListener( 'resize', onWindowResize, false );
+				function onWindowResize() {
+
+					textArea.style.left = "0px";
+					textArea.style.top = BAR_HEIGHT + "px";
+					textArea.style.width = window.innerWidth + "px";
+					textArea.style.height = ( window.innerHeight - BAR_HEIGHT ) + "px";
+
+				}
+
+				showDocumentContent();
+
+				textArea.focus();
+
+			}
+
+			function initStorage() {
+
+				loadAllNamesFromStorage();
+
+				if ( documentNames.length === 0 ) {
+
+					currentDocument = createEmptyDocument( "text" );
+					documentNames[ 0 ] = currentDocument.name;
+					saveDocument( currentDocument );
+
+				}
+
+				documentNames.sort();
+
+				currentDocument = loadDocument( documentNames[ 0 ] );
+
+			}
+
+			function loadAllNamesFromStorage() {
+
+				documentNames = [];
+
+				for ( var i = 0; i < localStorage.length; i++ ) {
+
+					documentNames.push( localStorage.key( i ) );
+
+				}
+
+			}
+
+			function loadDocument( documentName ) {
+
+				var storage = localStorage.getItem( documentName );
+
+				var document = JSON.parse( storage );
+
+				if ( document === null || document.version === undefined || document.name !== documentName ) {
+					document = createEmptyDocument( "text" );
+				}
+
+				if ( document.version > 1 ) {
+					// For future versions
+				}
+
+				if ( documentNames.indexOf( documentName ) === -1 ) {
+					documentNames.push( documentName );
+				}
+
+				return document;
+
+			}
+
+			function saveDocument( document ) {
+
+				localStorage.setItem( document.name, JSON.stringify( document ) );
+
+			}
+
+			function deleteDocument( document ) {
+
+				localStorage.removeItem( document.name );
+
+				if ( documentNames.indexOf( document.name ) !== -1 ) {
+					documentNames.splice( documentNames.indexOf( document.name ), 1 );
+				}
+
+			}
+
+			function showDocumentContent() {
+
+				switch ( currentDocument.type ) {
+
+					case "text":
+
+						textArea.value = currentDocument.content;
+
+						break;
+
+					default:
+						break;
+				}
+
+			}
+
+			function parseDocumentContent() {
+
+				switch ( currentDocument.type ) {
+
+					case "text":
+
+						currentDocument.content = textArea.value;
+
+						break;
+
+					default:
+						break;
+				}
+
+			}
+
+			function createEmptyDocument( type, name ) {
+
+				if ( name === undefined ) {
+
+					var i = 1;
+
+					do {
+
+						name = "Sin Nombre " + i++;
+
+					} while ( documentNames.indexOf( name ) !== -1 );
+
+				}
+				
+				var content = null;
+
+				switch ( type ) {
+
+					case "text":
+
+						content = "";
+
+						break;
+
+					default:
+						break;
+
+				}
+
+				return {
+
+					version: 1,
+					creationDate: new Date(),
+					modifiedDate: new Date(),
+					writeProtect: false,
+					name: name,
+
+					type: type,
+					content: content
+
+				};
+			
+			}
+
+			// TODO load documents on demand, only keep names and current one
+			
+		</script>
+
+	</body>
+</html>
