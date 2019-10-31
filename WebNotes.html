@@ -19,11 +19,11 @@
 			a {
 				color: #0080ff;
 			}
-			
+
 		</style>
 	</head>
 	<body>
-	
+
 		<script src='js/dat.gui.min.js'></script>
 
 		<script>
@@ -36,11 +36,11 @@
 				"text"
 			];
 
-			
+
 			var documentNames = null;
 
 			var currentDocument = null;
-			
+
 			var textArea;
 
 			// Main code
@@ -50,6 +50,8 @@
 			// Functions
 
 			function init() {
+
+				changeFavicon( "favicon.png" );
 
 				initStorage();
 
@@ -64,14 +66,14 @@
 				} );
 
 			}
-			
+
 
 			function initGUI() {
 
 				var BAR_HEIGHT = 25;
 
 				textArea = document.createElement( 'textarea' );
-				
+
 				textArea.autocapitalize = false;
 				textArea.autocomplete = false;
 				textArea.spellcheck = false;
@@ -88,15 +90,15 @@
 				var gui;
 
 				function createGUI() {
-				
+
 					var guiData = {
 
 						fileName: currentDocument.name,
 
 						rename: currentDocument.name,
-						
+
 						newDocument: "",
-						
+
 						deleteDocument: "---",
 
 						deleteAllDocuments: "---",
@@ -179,7 +181,7 @@
 					} );
 
 					gui.add( guiData, 'newDocument' ).name( "Nuevo Documento" ).onFinishChange( function( value ) {
-					
+
 						if ( ! value ) {
 
 							return;
@@ -189,7 +191,7 @@
 						if ( documentNames.indexOf( value ) !== -1 ) {
 
 							alert( "No se puede crear: El nombre de documento ya existe" );
-							
+
 							return;
 
 						}
@@ -213,7 +215,7 @@
 					} );
 
 					gui.add( guiData, 'deleteDocument', [ '---', 'Confirmar' ] ).name( "Borrar documento" ).onChange( function( value ) {
-	
+
 						if ( value !== 'Confirmar' ) {
 
 							return;
@@ -246,7 +248,7 @@
 					} );
 
 					gui.add( guiData, 'deleteAllDocuments', [ '---', 'Confirmar borrar TODO' ] ).name( "Borrar todo" ).onChange( function( value ) {
-	
+
 						if ( value !== 'Confirmar borrar TODO' ) {
 
 							return;
@@ -396,7 +398,7 @@
 					} while ( documentNames.indexOf( name ) !== -1 );
 
 				}
-				
+
 				var content = null;
 
 				switch ( type ) {
@@ -424,11 +426,21 @@
 					content: content
 
 				};
-			
+
 			}
 
-			// TODO load documents on demand, only keep names and current one
-			
+
+			function changeFavicon( src ) {
+
+				// from http://stackoverflow.com/questions/260857/changing-website-favicon-dynamically
+				var link = document.querySelector( "link[rel*='icon']" ) || document.createElement( 'link' );
+				link.type = 'image/x-icon';
+				link.rel = 'shortcut icon';
+				link.href = src;
+				document.getElementsByTagName( 'head' )[ 0 ].appendChild( link );
+
+			}
+
 		</script>
 
 	</body>
